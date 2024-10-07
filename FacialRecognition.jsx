@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './facialrecognition.scss';
 
-const API_BASE_URL = 'http://127.0.0.1:5001';
+const API_BASE_URL = '/api'; 
 
 const FacialRecognition = () => {
   const [testFaces, setTestFaces] = useState({});
@@ -26,8 +26,8 @@ const FacialRecognition = () => {
     setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/get_test_faces`);
-      console.log("Fetched test faces:", response.data);
       setTestFaces(response.data);
+      setError(null);
     } catch (error) {
       console.error('Error fetching test faces:', error);
       setError('Failed to load test faces. Please ensure the server is running and try again.');
@@ -39,10 +39,9 @@ const FacialRecognition = () => {
   const fetchEigenfaces = async (personId) => {
     setLoading(true);
     try {
-      console.log("Fetching eigenfaces for person:", personId);
       const response = await axios.post(`${API_BASE_URL}/get_eigenfaces`, { person_id: personId });
-      console.log("Fetched eigenfaces:", response.data);
       setEigenfaces(response.data);
+      setError(null);
     } catch (error) {
       console.error('Error fetching eigenfaces:', error);
       setError('Failed to load eigenfaces. Please ensure the server is running and try again.');
@@ -53,7 +52,6 @@ const FacialRecognition = () => {
 
   const handleFaceChange = (event) => {
     const newSelectedFace = event.target.value;
-    console.log("Selected face changed to:", newSelectedFace);
     setSelectedFace(newSelectedFace);
     setRecognitionResult(null);
   };
@@ -66,11 +64,9 @@ const FacialRecognition = () => {
 
     setLoading(true);
     try {
-      console.log("Recognizing face:", selectedFace);
       const response = await axios.post(`${API_BASE_URL}/recognize_face`, {
         person_id: selectedFace
       });
-      console.log("Recognition result:", response.data);
       setRecognitionResult(response.data);
       setError(null);
     } catch (error) {
