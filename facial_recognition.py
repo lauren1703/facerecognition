@@ -1,6 +1,3 @@
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-import os
 import cv2
 import numpy as np
 from sklearn.decomposition import PCA
@@ -13,24 +10,16 @@ import matplotlib.pyplot as plt
 import io
 import logging
 
-app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}})
-
-logging.basicConfig(level=logging.DEBUG)
-
 faces = {}
 test_faces = {}
 pca = None
-removed_person = None
+removed_person = "s15"  
 faceshape = None
 
 def load_faces(zip_path="attface.zip"):
     global faces, test_faces, removed_person, faceshape
     with zipfile.ZipFile(zip_path) as facezip:
         all_files = [f for f in facezip.namelist() if f.endswith(".pgm")]
-        all_persons = set(f.split("/")[0] for f in all_files)
-        
-        removed_person = random.choice(list(all_persons))
         
         for filename in all_files:
             person_id = filename.split("/")[0]
@@ -45,7 +34,7 @@ def load_faces(zip_path="attface.zip"):
                 if person_id == removed_person:
                     if test_faces[person_id] is None:
                         test_faces[person_id] = face
-                elif test_faces[person_id] is None and random.random() < 0.1:
+                elif test_faces[person_id] is None and len(faces[person_id]) == 9:  # Use the 10th image as test
                     test_faces[person_id] = face
                 else:
                     faces[person_id].append(face)
@@ -60,7 +49,6 @@ def prepare_pca():
     pca = PCA(n_components=50)
     pca.fit(facematrix)
 
-@app.route('/get_test_faces', methods=['GET'])
 def get_test_faces():
     logging.info("Fetching test faces")
     test_faces_data = {}
@@ -71,17 +59,14 @@ def get_test_faces():
             test_faces_data[person_id] = face_base64
     
     logging.info(f"Returning {len(test_faces_data)} test faces")
-    return jsonify(test_faces_data)
+    return test_faces_data
 
-@app.route('/get_eigenfaces', methods=['POST'])
-def get_eigenfaces():
-    data = request.json
-    person_id = data.get('person_id')
+def get_eigenfaces(person_id):
     logging.info(f"Generating eigenfaces for person {person_id}")
     
     if person_id not in test_faces:
         logging.error(f"Invalid person ID: {person_id}")
-        return jsonify({'error': 'Invalid person ID'}), 400
+        return {'error': 'Invalid person ID'}
     
     query = test_faces[person_id]
     query_weight = pca.transform([query.flatten()])[0]
@@ -102,18 +87,14 @@ def get_eigenfaces():
     plt.close(fig)
     
     logging.info("Eigenfaces generated successfully")
-    return jsonify({
+    return {
         'eigenfaces_image': eigenfaces_image,
         'weights_shape': query_weight.shape
-    })
+    }
 
-@app.route('/recognize_face', methods=['POST'])
-def recognize_face():
-    data = request.json
-    person_id = data.get('person_id')
-    
+def recognize_face(person_id):
     if person_id not in test_faces:
-        return jsonify({'error': 'Invalid person ID'}), 400
+        return {'error': 'Invalid person ID'}
     
     query = test_faces[person_id]
     query_weight = pca.transform([query.flatten()])[0]
@@ -129,15 +110,9 @@ def recognize_face():
     _, buffer = cv2.imencode('.png', best_match_face)
     best_match_face_base64 = base64.b64encode(buffer).decode('utf-8')
     
-    return jsonify({
+    return {
         'best_match': best_match_person,
         'distance': float(best_match_distance),
-        'best_match_image': best_match_face_base64
-    })
-
-if __name__ == '__main__':
-    load_faces()
-    prepare_pca()
-    print("Loaded faces for", len(faces), "people")
-    print("Removed person:", removed_person)
-    app.run(debug=True, host='0.0.0.0', port=5001)
+        'best_match_image': best_match_face_base64,
+        'is_removed_person': person_id == removed_person  # New field
+    }
