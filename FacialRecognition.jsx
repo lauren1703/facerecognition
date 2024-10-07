@@ -11,6 +11,8 @@ const FacialRecognition = () => {
   const [eigenfaces, setEigenfaces] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [isRemovedPerson, setIsRemovedPerson] = useState(false);
+
 
   useEffect(() => {
     fetchTestFaces();
@@ -61,13 +63,16 @@ const FacialRecognition = () => {
       setError('Please select a face first');
       return;
     }
-
+  
     setLoading(true);
     try {
+      console.log("Recognizing face:", selectedFace);
       const response = await axios.post(`${API_BASE_URL}/recognize_face`, {
         person_id: selectedFace
       });
+      console.log("Recognition result:", response.data);
       setRecognitionResult(response.data);
+      setIsRemovedPerson(response.data.is_removed_person);
       setError(null);
     } catch (error) {
       console.error('Error recognizing face:', error);
@@ -100,6 +105,12 @@ const FacialRecognition = () => {
         {recognitionResult && (
           <div className="recognition-result">
             <h4>Recognition Result</h4>
+            {isRemovedPerson && (
+              <p className="warning">
+                Note: The selected face is outside the training set. 
+                The system will find the closest matching face.
+              </p>
+            )}
             <p>Best Match: Person {recognitionResult.best_match}</p>
             <p>Distance: {recognitionResult.distance.toFixed(2)}</p>
             <img src={`data:image/png;base64,${recognitionResult.best_match_image}`} alt="Best match face" />
